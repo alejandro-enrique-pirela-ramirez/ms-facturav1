@@ -64,7 +64,7 @@ public class Factura {
     private EstadoFactura estado = EstadoFactura.PENDIENTE;
 
     @Column(name = "document_id")
-    private String documentId;                // id que devuelve APISUNAT en sendBill
+    private String documentId;              
 
     @Column(name = "hash_cpe")
     private String hashCpe;

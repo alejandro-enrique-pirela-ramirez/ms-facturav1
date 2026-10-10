@@ -50,5 +50,5 @@ public class DetalleFactura {
     private BigDecimal igv;
     private BigDecimal total;
 
-    // Se eliminó el setFactura() vacío: pisaba el de Lombok y id_factura quedaba null.
+    
 }

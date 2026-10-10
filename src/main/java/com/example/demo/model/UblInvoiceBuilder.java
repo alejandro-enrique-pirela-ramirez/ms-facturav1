@@ -16,11 +16,7 @@ import org.springframework.stereotype.Component;
 import com.example.demo.bean.entity.DetalleFactura;
 import com.example.demo.bean.entity.Factura;
 
-/**
- * Arma el documentBody (UBL 2.1 en JSON) que espera APISUNAT.
- * El orden de las claves sigue el orden de elementos de UBL.
- * Compáralo con el JSON del botón { } del portal de APISUNAT.
- */
+
 @Component
 public class UblInvoiceBuilder {
 

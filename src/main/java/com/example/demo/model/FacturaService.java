@@ -27,6 +27,7 @@ import com.example.demo.bean.enums.EstadoFactura;
 import com.example.demo.client.ApisunatClient;
 import com.example.demo.client.ClienteClient;
 import com.example.demo.client.ProductoClient;
+import com.example.demo.rabbitmq.FacturaProductor;
 import com.example.demo.repository.FacturaRepository;
 import com.example.demo.useCase.FacturaUseCase;
 
@@ -48,6 +49,7 @@ public class FacturaService implements FacturaUseCase {
     private final ProductoClient productoClient;
     private final ApisunatClient apisunatClient;
     private final UblInvoiceBuilder ublBuilder;
+    private final FacturaProductor productor;
 
     @Value("${apisunat.url}") private String apisunatUrl;
     @Value("${apisunat.persona-id}") private String personaId;
@@ -119,14 +121,13 @@ public class FacturaService implements FacturaUseCase {
         f.setIgv(igv);
         f.setTotal(subtotal.add(igv));
 
-        // 1) Se guarda PENDIENTE antes de llamar a APISUNAT: nunca se pierde el registro
+       
         f = facturaRepository.save(f);
 
-        // 2) Se envía a APISUNAT
+   
         enviar(f, cliente);
 
-        // 3) SUNAT responde en segundos: se consulta unas veces; si no, queda PENDIENTE
-        //    y el front puede llamar a POST /api/facturas/{id}/actualizar
+     
         for (int i = 0; i < 3 && f.getEstado() == EstadoFactura.PENDIENTE && f.getDocumentId() != null; i++) {
             try {
                 Thread.sleep(1500);
@@ -136,15 +137,20 @@ public class FacturaService implements FacturaUseCase {
             }
             f = refrescar(f);
         }
+
+        
+        if (f.getEstado() == EstadoFactura.PENDIENTE && f.getDocumentId() != null) {
+            productor.publicarPendiente(f.getIdFactura());
+        }
         return toDto(f);
     }
 
-    // ------------------------------------------------------------- actualizar
+  
     @Override
     public FacturaResponseDto actualizar(Long id) {
         Factura f = obtener(id);
         if (f.getEstado() == EstadoFactura.PENDIENTE) {
-            if (f.getDocumentId() == null) {                 // el envío anterior falló: se reintenta
+            if (f.getDocumentId() == null) {              
                 enviar(f, obtenerCliente(f.getIdCliente()));
             }
             f = refrescar(f);
@@ -152,7 +158,6 @@ public class FacturaService implements FacturaUseCase {
         return toDto(f);
     }
 
-    // ----------------------------------------------------------- consultas
     @Override
     public FacturaResponseDto buscarPorId(Long id) {
         return toDto(obtener(id));
@@ -168,7 +173,6 @@ public class FacturaService implements FacturaUseCase {
         return facturaRepository.findByIdClienteOrderByFechaCreacionDesc(idCliente).stream().map(this::toDto).toList();
     }
 
-    // ------------------------------------------------------------ APISUNAT
     private void enviar(Factura f, ClienteDto cliente) {
         String fileName = fileName(f);
         try {
@@ -222,12 +226,14 @@ public class FacturaService implements FacturaUseCase {
             f.setMensajeSunat(resumen(doc));
             f.setFechaRespuesta(fecha(doc.responseTime()));
         } else {
-            return f;                                         // sigue pendiente
+            return f;                                         
         }
-        return facturaRepository.save(f);
+        f = facturaRepository.save(f);
+        productor.publicarEstado(f);                          
+        return f;
     }
 
-    /** El stock solo se descuenta cuando SUNAT acepta (se ejecuta una sola vez: PENDIENTE -> ACEPTADO). */
+
     private void descontarStock(Factura f) {
         String ref = f.getSerie() + "-" + f.getNumero();
         for (DetalleFactura d : f.getDetalles()) {
@@ -307,7 +313,7 @@ public class FacturaService implements FacturaUseCase {
         return new ResponseStatusException(status, msg);
     }
 
-    // -------------------------------------------------------------- mapeo
+
     private FacturaResponseDto toDto(Factura f) {
         FacturaResponseDto dto = new FacturaResponseDto();
         dto.setIdFactura(f.getIdFactura());

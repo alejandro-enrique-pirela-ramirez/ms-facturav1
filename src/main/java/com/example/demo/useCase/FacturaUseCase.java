@@ -10,7 +10,7 @@ public interface FacturaUseCase {
 
     FacturaResponseDto emitir(FacturaRequestDto request);
 
-    /** Consulta a APISUNAT el estado de una factura PENDIENTE y actualiza la BD. */
+  
     FacturaResponseDto actualizar(Long id);
 
     FacturaResponseDto buscarPorId(Long id);
