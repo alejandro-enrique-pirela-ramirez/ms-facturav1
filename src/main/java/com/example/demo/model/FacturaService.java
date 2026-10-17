@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.demo.bean.apisunat.ApisunatDocumentResponse;
 import com.example.demo.bean.apisunat.ApisunatSendRequest;
 import com.example.demo.bean.apisunat.ApisunatSendResponse;
+import com.example.demo.bean.apisunat.ApisunatVoidRequest;
 import com.example.demo.bean.dto.ClienteDto;
 import com.example.demo.bean.dto.DetalleResponseDto;
 import com.example.demo.bean.dto.FacturaRequestDto;
@@ -155,6 +156,38 @@ public class FacturaService implements FacturaUseCase {
             }
             f = refrescar(f);
         }
+        return toDto(f);
+    }
+    
+    @Override
+    public FacturaResponseDto anular(Long id, String motivo) {
+        String razon = motivo == null ? "" : motivo.trim();
+        if (razon.length() < 3 || razon.length() > 100) {
+            throw error(HttpStatus.BAD_REQUEST, "El motivo debe tener entre 3 y 100 caracteres");
+        }
+        Factura f = obtener(id);
+        if (f.getEstado() != EstadoFactura.ACEPTADO) {
+            throw error(HttpStatus.CONFLICT,
+                    "Solo se puede anular una factura ACEPTADO (estado actual: " + f.getEstado() + ")");
+        }
+        if (f.getDocumentId() == null) {
+            throw error(HttpStatus.CONFLICT, "La factura no tiene documentId en APISUNAT");
+        }
+
+        try {
+            ApisunatSendResponse resp = apisunatClient.voidBill(
+                    new ApisunatVoidRequest(personaId, personaToken, f.getDocumentId(), razon));
+            if ("ERROR".equals(resp.status())) {
+                throw error(HttpStatus.UNPROCESSABLE_ENTITY, truncar("APISUNAT: " + resp.error()));
+            }
+        } catch (FeignException e) {
+            throw error(HttpStatus.BAD_GATEWAY, truncar("APISUNAT " + e.status() + ": " + e.contentUTF8()));
+        }
+
+        f.setEstado(EstadoFactura.ANULADO);
+        f.setMensajeSunat(truncar("ANULADO: " + razon));
+        f = facturaRepository.save(f);
+        productor.publicarEstado(f);
         return toDto(f);
     }
 

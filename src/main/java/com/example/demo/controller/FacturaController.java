@@ -1,9 +1,14 @@
 package com.example.demo.controller;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -63,9 +68,36 @@ public class FacturaController {
         return ResponseEntity.ok(facturaUseCase.buscarPorId(id));
     }
 
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> descargarPdf(@PathVariable Long id) {
+        FacturaResponseDto f = facturaUseCase.buscarPorId(id);
+        if (f.getUrlPdf() == null || f.getUrlPdf().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "La factura no tiene PDF disponible");
+        }
+
+        byte[] pdf;
+        try (InputStream in = URI.create(f.getUrlPdf()).toURL().openStream()) {
+            pdf = in.readAllBytes();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo descargar el PDF desde APISUNAT");
+        }
+
+        String nombre = f.getSerie() + "-" + f.getNumero() + ".pdf";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombre + "\"")
+                .body(pdf);
+    }
+
     @GetMapping("/estado/{estado}")
     public ResponseEntity<List<FacturaResponseDto>> porEstado(@PathVariable EstadoFactura estado) {
         return ResponseEntity.ok(facturaUseCase.listarPorEstado(estado));
+    }
+
+    @PostMapping("/{id}/anular")
+    public ResponseEntity<FacturaResponseDto> anular(@PathVariable Long id,
+                                                     @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(facturaUseCase.anular(id, body.get("motivo")));
     }
 
     @GetMapping("/cliente/{idCliente}")

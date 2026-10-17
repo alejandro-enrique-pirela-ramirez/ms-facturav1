@@ -23,6 +23,14 @@ public class UblInvoiceBuilder {
     private static final ZoneId LIMA = ZoneId.of("America/Lima");
     private static final DateTimeFormatter HMS = DateTimeFormatter.ofPattern("HH:mm:ss");
 
+    private static final Map<String, String> UNIDADES_SUNAT = Map.of(
+            "BALON", "NIU",
+            "UNIDAD", "NIU",
+            "M3", "MTQ",
+            "LITRO", "LTR",
+            "KG", "KGM",
+            "CAJA", "BX");
+
     @Value("${emisor.ruc}") private String ruc;
     @Value("${emisor.razon-social}") private String razonSocial;
     @Value("${emisor.nombre-comercial}") private String nombreComercial;
@@ -88,6 +96,13 @@ public class UblInvoiceBuilder {
             "cac:PartyLegalEntity", legal));
     }
 
+    private static String codigoUnidadSunat(String unidad) {
+        if (unidad == null || unidad.isBlank()) {
+            return "NIU";
+        }
+        return UNIDADES_SUNAT.getOrDefault(unidad.trim().toUpperCase(), "NIU");
+    }
+
     private List<Object> lines(Factura f, String cur) {
         List<Object> out = new ArrayList<>();
         int i = 1;
@@ -95,8 +110,7 @@ public class UblInvoiceBuilder {
             BigDecimal valorVenta = d.getTotal().subtract(d.getIgv());
             BigDecimal precioConIgv = d.getValorUnitario()
                     .multiply(BigDecimal.ONE.add(d.getPorcentajeIgv().movePointLeft(2)));
-            String unidad = d.getUnidadMedida() != null && d.getUnidadMedida().matches("^[A-Z0-9]{2,3}$")
-                    ? d.getUnidadMedida() : "NIU";
+            String unidad = codigoUnidadSunat(d.getUnidadMedida());
             String codigo = d.getCodigoProducto() == null || d.getCodigoProducto().isBlank() ? "SIN-CODIGO" : d.getCodigoProducto();
 
             out.add(o(

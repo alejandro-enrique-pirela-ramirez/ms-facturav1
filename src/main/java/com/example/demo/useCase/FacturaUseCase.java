@@ -18,4 +18,6 @@ public interface FacturaUseCase {
     List<FacturaResponseDto> listarPorEstado(EstadoFactura estado);
 
     List<FacturaResponseDto> listarPorCliente(Long idCliente);
+    
+    FacturaResponseDto anular(Long id, String motivo);
 }

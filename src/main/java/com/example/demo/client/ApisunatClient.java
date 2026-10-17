@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.example.demo.bean.apisunat.ApisunatDocumentResponse;
 import com.example.demo.bean.apisunat.ApisunatSendRequest;
 import com.example.demo.bean.apisunat.ApisunatSendResponse;
+import com.example.demo.bean.apisunat.ApisunatVoidRequest;
 
 @FeignClient(name = "apisunat-client", url = "${apisunat.url}")
 public interface ApisunatClient {
@@ -18,4 +19,7 @@ public interface ApisunatClient {
 
     @GetMapping("/documents/{documentId}/getById")
     ApisunatDocumentResponse getById(@PathVariable("documentId") String documentId);
+    
+    @PostMapping("/personas/v1/voidBill")
+    ApisunatSendResponse voidBill(@RequestBody ApisunatVoidRequest request);
 }
